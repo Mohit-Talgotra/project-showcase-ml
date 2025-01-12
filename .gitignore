@@ -1,2 +1,4 @@
 *\venv
 .env
+*\input_files
+*\output_files

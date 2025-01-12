@@ -15,21 +15,28 @@ class SimpleDocGenerator:
     def process_audio(self, audio_path):
         print("Transcribing audio...")
         result = self.whisper_model.transcribe(audio_path)
+        print(result['text'])
         return result['text']
     
     def analyze_content(self, transcript, screenshots):
         print("Analyzing content...")
         prompt = f"""
-        Create a product documentation based on this transcript and {len(screenshots)} screenshots:
+        Create a product documentation based on this transcript and {len(screenshots)} screenshots.
         
         Transcript: {transcript}
         
-        Generate a markdown document with:
+        Generate a markdown document with the following sections:
         1. Product Overview
-        2. Key Features
+        2. Key Features (with specific places to insert screenshots)
         3. Technical Details
         
-        Make it professional and concise.
+        Important formatting instructions:
+        - Use '{{{{screenshot-1}}}}' to indicate where the first screenshot should be placed
+        - Use '{{{{screenshot-2}}}}' for the second screenshot, and so on
+        - Create meaningful section transitions
+        - Include image captions that describe what each screenshot shows
+        
+        Make it professional and concise while integrating the screenshots naturally into the content. Also, look out for any weird punctuation like out of place brackets which shouldn't be there.
         """
         
         response = self.groq_client.chat.completions.create(
@@ -48,25 +55,109 @@ class SimpleDocGenerator:
         <head>
             <title>Product Documentation</title>
             <style>
-                body { max-width: 800px; margin: 0 auto; padding: 20px; font-family: Arial; }
-                img { max-width: 100%; margin: 20px 0; }
+                :root {
+                    --primary-color: #2c3e50;
+                    --secondary-color: #3498db;
+                    --background-color: #f9fafb;
+                    --text-color: #333;
+                }
+                
+                body {
+                    max-width: 1000px;
+                    margin: 0 auto;
+                    padding: 40px;
+                    font-family: 'Segoe UI', Arial, sans-serif;
+                    line-height: 1.6;
+                    background-color: var(--background-color);
+                    color: var(--text-color);
+                }
+                
+                h1, h2, h3 {
+                    color: var(--primary-color);
+                    margin-top: 2em;
+                    margin-bottom: 1em;
+                    border-bottom: 2px solid var(--secondary-color);
+                    padding-bottom: 0.5em;
+                }
+                
+                h1 { font-size: 2.5em; }
+                h2 { font-size: 2em; }
+                h3 { font-size: 1.5em; }
+                
+                .content-wrapper {
+                    background: white;
+                    padding: 40px;
+                    border-radius: 8px;
+                    box-shadow: 0 2px 15px rgba(0, 0, 0, 0.1);
+                }
+                
+                .screenshot-container {
+                    margin: 30px 0;
+                    text-align: center;
+                }
+                
+                .screenshot {
+                    max-width: 100%;
+                    border-radius: 4px;
+                    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+                    transition: transform 0.3s ease;
+                }
+                
+                .screenshot:hover {
+                    transform: scale(1.02);
+                }
+                
+                .caption {
+                    margin-top: 10px;
+                    font-style: italic;
+                    color: #666;
+                }
+                
+                p {
+                    margin: 1em 0;
+                    text-align: justify;
+                }
+                
+                code {
+                    background-color: #f7f9fa;
+                    padding: 2px 5px;
+                    border-radius: 3px;
+                    font-family: 'Consolas', monospace;
+                }
+                
+                @media (max-width: 768px) {
+                    body {
+                        padding: 20px;
+                    }
+                    
+                    .content-wrapper {
+                        padding: 20px;
+                    }
+                }
             </style>
         </head>
         <body>
-            {{ content }}
-            {% for screenshot in screenshots %}
-            <img src="{{ screenshot }}" alt="Product Screenshot">
-            {% endfor %}
+            <div class="content-wrapper">
+                {{ content }}
+            </div>
         </body>
         </html>
         """
         
+        # Replace screenshot placeholders with HTML
         html_content = markdown.markdown(markdown_content)
+        for i, screenshot in enumerate(screenshots, 1):
+            placeholder = f"{{screenshot-{i}}}"
+            screenshot_html = f"""
+            <div class="screenshot-container">
+                <img class="screenshot" src="{screenshot}" alt="Product Screenshot {i}">
+                <p class="caption">Figure {i}</p>
+            </div>
+            """
+            html_content = html_content.replace(placeholder, screenshot_html)
+        
         template = Template(html_template)
-        return template.render(
-            content=html_content,
-            screenshots=screenshots
-        )
+        return template.render(content=html_content)
     
     def generate(self, audio_path, screenshot_paths):
         transcript = self.process_audio(audio_path)
