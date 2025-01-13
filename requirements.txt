@@ -1,0 +1,5 @@
+openai-whisper
+groq
+python-dotenv
+reportlab
+jinja2

@@ -77,21 +77,34 @@ class PDFDocGenerator:
             "sections": [
                 {{
                     "heading": "Overview",
-                    "content": ["paragraph1", "paragraph2"]
+                    "content": [
+                        "paragraph1",
+                        "paragraph2"
+                    ]
                 }},
                 {{
                     "heading": "Key Features",
-                    "content": ["feature1", "[[SCREENSHOT-1]]", "caption1", "feature2", "[[SCREENSHOT-2]]", "caption2"]
+                    "content": [
+                        "feature1",
+                        "[[SCREENSHOT-1]]",
+                        "caption1",
+                        "feature2",
+                        "[[SCREENSHOT-2]]",
+                        "caption2"
+                    ]
                 }},
                 {{
                     "heading": "Technical Details",
-                    "content": ["detail1", "detail2"]
+                    "content": [
+                        "detail1",
+                        "detail2"
+                    ]
                 }}
             ]
         }}
 
         2. Content rules:
-        - Extract the title of the product from the transcription given
+        - Extract the product name from the transcription given
         - Each paragraph, feature, and detail should be filled with descriptive content which sells the product to the audience
         - Each screenshot should have a descriptive caption
         - Break the content into clear sections with headers
@@ -101,7 +114,6 @@ class PDFDocGenerator:
         2. Screenshot placement rules:
         - Screenshots MUST ONLY appear in the Key Features section
         - Use exact format "[[SCREENSHOT-1]]" for first screenshot, "[[SCREENSHOT-2]]" for second, and so on
-        - Screenshots should always be an individual element in the dictionary as given in the JSON structure
         - Place ONE caption immediately after each screenshot
         - Captions should be plain text without any labels or prefixes
 
@@ -181,14 +193,31 @@ class PDFDocGenerator:
             
             for item in section["content"]:
                 if item.startswith("[[SCREENSHOT-"):
-                    print("screenshot found!")
                     screenshot_num = int(item.split('-')[1].rstrip(']]')) - 1
+                    if screenshot_num < len(screenshot_paths):
+                        description.append(Spacer(1, 12))
+                        img = self.prepare_image(screenshot_paths[screenshot_num])
+                        description.append(img)
+                    continue
+
+                if item.startswith('Figure ') or any(item.lower().startswith(x) for x in ['caption:', 'figure:', 'image:']):
+                    caption = Paragraph(item, self.styles["ImageCaption"])
+                    description.append(caption)
+                    description.append(Spacer(1, 12))
+                    continue
+
+                screenshot_split = item.split("[[SCREENSHOT-")
+                if len(screenshot_split) > 1:
+                    main_text = screenshot_split[0].strip()
+                    if main_text:
+                        para = Paragraph(main_text, self.styles["CustomBody"])
+                        description.append(para)
+                        description.append(Spacer(1, 12))
+
+                    screenshot_num = int(screenshot_split[1].split(']]')[0]) - 1
                     if screenshot_num < len(screenshot_paths):
                         img = self.prepare_image(screenshot_paths[screenshot_num])
                         description.append(img)
-                elif item.startswith('Figure '):
-                    caption = Paragraph(item, self.styles["ImageCaption"])
-                    description.append(caption)
                 else:
                     para = Paragraph(item, self.styles["CustomBody"])
                     description.append(para)
