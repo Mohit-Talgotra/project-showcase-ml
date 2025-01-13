@@ -65,52 +65,70 @@ class PDFDocGenerator:
     
     def analyze_content(self, transcript, screenshots):
         print("Analyzing content...")
-        prompt = f"""
-        Create a product documentation based on this transcript and {len(screenshots)} screenshots.
-        
+        prompt = f"""You are a documentation generator. Your task is to create a strictly formatted JSON output for a product documentation based on a transcript and screenshots.
+
         Transcript: {transcript}
-        
-        Generate a document with the following sections:
-        1. Overview
-        2. Key Features (with specific places to insert screenshots)
-        3. Technical Details
-        
-        Important formatting instructions(FOLLOW ALL OF THEM STRICTLY):
-        - Use '[[SCREENSHOT-1]]' to indicate where the first screenshot should be placed
-        - Use '[[SCREENSHOT-2]]' for the second screenshot, and so on
-        - The placement of the screenshots should always and ONLY be in the Key Features section and each screenshot can only be used ONCE
-        - Each screenshot should have a descriptive caption which should only have the caption content
-        - Break the content into clear sections with headers
-        - Keep paragraphs concise and focused
-        - There should be space between a image and the content after it
-        - Whenever using a punctuation, in place of the punctuation, add \ followed by the punctuation mark
-        - Try to include punctuation somewhere in the document
-        
-        Format the response as a JSON object with the following structure:
+        Number of screenshots: {len(screenshots)}
+
+        Rules for JSON structure(ALL RULES MUST BE FOLLOWED STRICTLY):
+        1. The output must be EXACTLY this structure, no additional fields or sections allowed:
         {{
             "title": "Product Name",
             "sections": [
                 {{
-                    "heading": "section heading",
-                    "content": ["paragraph1", "paragraph2", "[[SCREENSHOT-1]]", "caption1", ...]
+                    "heading": "Overview",
+                    "content": ["paragraph1", "paragraph2"]
+                }},
+                {{
+                    "heading": "Key Features",
+                    "content": ["feature1", "[[SCREENSHOT-1]]", "caption1", "feature2", "[[SCREENSHOT-2]]", "caption2"]
+                }},
+                {{
+                    "heading": "Technical Details",
+                    "content": ["detail1", "detail2"]
                 }}
             ]
         }}
 
-        Important JSON Formatting Instructions:
-        - Screenshot placeholders should always be an individual item in the content dictionaries which are under the sections element ONLY
-        - Captions should not start with Caption 1:, it should only be the caption
-        - The sections dictionary should always include each section specified above, and ONLY those sections, no extra section should be added
-        - Main JSON Dictionary should ONLY have 2 elements: title and sections. Sections should only have three elements: Overview, Key Features, and Technical Details
-        """
+        2. Content rules:
+        - Extract the title of the product from the transcription given
+        - Each paragraph, feature, and detail should be filled with descriptive content which sells the product to the audience
+        - Each screenshot should have a descriptive caption
+        - Break the content into clear sections with headers
+        - The content added to the given JSON structure should be human-like
+        - Content should be between 3-5 sentences in the overview, and between 10-15 sentences in the key features and technical details
+
+        2. Screenshot placement rules:
+        - Screenshots MUST ONLY appear in the Key Features section
+        - Use exact format "[[SCREENSHOT-1]]" for first screenshot, "[[SCREENSHOT-2]]" for second, and so on
+        - Screenshots should always be an individual element in the dictionary as given in the JSON structure
+        - Place ONE caption immediately after each screenshot
+        - Captions should be plain text without any labels or prefixes
+
+        3. Formatting rules:
+        - No nested objects except as shown in the structure
+        - No additional sections or fields
+        - No markdown or special formatting in text
+        - Use double quotes for strings
+        - Ensure all strings are properly escaped
+
+        Generate the documentation following these rules exactly."""
         
-        response = self.groq_client.chat.completions.create(
-            messages=[{"role": "user", "content": prompt}],
-            model="mixtral-8x7b-32768",
-            temperature=0.3
-        )
-        print(response)
-        return ast.literal_eval(response.choices[0].message.content)
+        try:
+            response = self.groq_client.chat.completions.create(
+                messages=[{"role": "user", "content": prompt}],
+                model="mixtral-8x7b-32768",
+                temperature=0.3
+            )
+            
+            content = response.choices[0].message.content.strip()
+            content = content.replace("```json", "").replace("```", "").strip()
+            return json.loads(content)
+            
+        except json.JSONDecodeError as e:
+            print(f"Error parsing JSON response: {e}")
+            print("Raw response:", response.choices[0].message.content)
+            raise
 
     def save_json_content(self, content_dict, base_filename):
         json_filename = f"{os.path.splitext(base_filename)[0]}.json"
